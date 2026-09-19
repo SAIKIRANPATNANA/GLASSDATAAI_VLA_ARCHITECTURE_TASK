@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VLA Architecture — Robotic Manipulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --vision: #3b82f6;
+    --vision-glow: rgba(59,130,246,0.3);
+    --lang: #22c55e;
+    --lang-glow: rgba(34,197,94,0.3);
+    --fusion: #a855f7;
+    --fusion-glow: rgba(168,85,247,0.3);
+    --action: #f97316;
+    --action-glow: rgba(249,115,22,0.3);
+    --bg: #050810;
+    --bg2: #0d1117;
+    --card: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.08);
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ---- PROGRESS ---- */
+  #progress-bar {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: linear-gradient(90deg, var(--vision), var(--fusion), var(--action));
+    transition: width 0.4s ease;
+    z-index: 999;
+    box-shadow: 0 0 10px var(--fusion-glow);
+  }
+
+  /* ---- NAV ---- */
+  #nav {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 12px; align-items: center;
+    background: rgba(13,17,23,0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 10px 20px;
+    z-index: 999;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .nav-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .nav-btn:hover { background: var(--accent); border-color: var(--accent); }
+  #slide-counter {
+    font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 60px; text-align: center;
+  }
+
+
+  /* ---- SLIDES CONTAINER ---- */
+  #slides { width: 100%; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 60px 80px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16,1,0.3,1);
+    transform: translateY(24px);
+  }
+  .slide.active {
+    opacity: 1; pointer-events: all; transform: translateY(0);
+  }
+  .slide.exit {
+    opacity: 0; transform: translateY(-24px);
+  }
+
+  /* Background glow per slide theme */
+  .slide::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 800px 600px at 50% -100px, var(--slide-glow, rgba(99,102,241,0.08)), transparent);
+    pointer-events: none;
+  }
+
+  /* ---- TYPOGRAPHY ---- */
+  .slide-label {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--slide-accent, var(--accent));
+    margin-bottom: 16px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .slide-label::before {
+    content: ''; display: block; width: 24px; height: 2px;
+    background: var(--slide-accent, var(--accent));
+    border-radius: 2px;
+  }
+  h1 { font-size: clamp(32px, 4vw, 56px); font-weight: 800; line-height: 1.1; text-align: center; }
+  h2 { font-size: clamp(24px, 3vw, 40px); font-weight: 700; line-height: 1.2; text-align: center; }
+  .gradient-text {
+    background: linear-gradient(135deg, var(--vision), var(--fusion), var(--action));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .subtitle {
+    font-size: 18px; color: var(--muted); text-align: center;
+    margin-top: 16px; font-weight: 400; max-width: 700px; line-height: 1.6;
+  }
+
+  /* ---- CARDS ---- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(10px);
+  }
+  .card-grid { display: grid; gap: 16px; width: 100%; max-width: 1000px; }
+  .card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .card-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    border: 1px solid currentColor;
+  }
+  .pill-blue { color: var(--vision); background: var(--vision-glow); }
+  .pill-green { color: var(--lang); background: var(--lang-glow); }
+  .pill-purple { color: var(--fusion); background: var(--fusion-glow); }
+  .pill-orange { color: var(--action); background: var(--action-glow); }
+
+  /* ---- COLORED CARDS ---- */
+  .card-vision { border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.06); }
+  .card-lang { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.06); }
+  .card-fusion { border-color: rgba(168,85,247,0.3); background: rgba(168,85,247,0.06); }
+  .card-action { border-color: rgba(249,115,22,0.3); background: rgba(249,115,22,0.06); }
+  .card-accent { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.06); }
+
+  .card-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .card-body { font-size: 14px; line-height: 1.7; color: var(--muted); }
+
+  /* ---- TABLE ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    padding: 10px 16px; text-align: left;
+    background: rgba(255,255,255,0.04);
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--muted);
+  }
+  td:first-child { color: var(--text); font-weight: 500; }
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; width: 100%; }
+
+  /* ---- CODE ---- */
+  .code-block {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; line-height: 1.7;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    color: #e2e8f0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .code-blue { color: var(--vision); }
+  .code-green { color: var(--lang); }
+  .code-purple { color: var(--fusion); }
+  .code-orange { color: var(--action); }
+  .code-muted { color: var(--muted); }
+
+  /* ---- FLOW ARROW ---- */
+  .flow {
+    display: flex; align-items: center; gap: 0;
+    width: 100%; max-width: 900px;
+    flex-wrap: nowrap;
+  }
+  .flow-node {
+    flex: 1; text-align: center; padding: 14px 8px;
+    border-radius: 12px;
+    font-size: 13px; font-weight: 600;
+    line-height: 1.3;
+    min-width: 0;
+  }
+  .flow-arrow {
+    flex-shrink: 0; width: 32px; text-align: center;
+    color: var(--muted); font-size: 18px;
+  }
+  .flow-sub { font-size: 10px; font-weight: 400; color: var(--muted); margin-top: 4px; display: block; }
+
+  /* ---- STAT BOX ---- */
+  .stat-box { text-align: center; }
+  .stat-num {
+    font-size: 36px; font-weight: 800; line-height: 1;
+    background: linear-gradient(135deg, var(--stat-c1, #6366f1), var(--stat-c2, #a855f7));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* ---- CHALLENGE CARD ---- */
+  .challenge {
+    border-left: 3px solid var(--ch-color, var(--accent));
+    padding-left: 16px;
+  }
+  .challenge-title { font-size: 14px; font-weight: 700; color: var(--ch-color, var(--accent)); margin-bottom: 4px; }
+  .challenge-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* ---- HERO QUOTE ---- */
+  .hero-quote {
+    font-size: clamp(18px, 2.5vw, 28px);
+    font-weight: 300; line-height: 1.5;
+    text-align: center; color: var(--muted);
+    font-style: italic;
+    max-width: 800px;
+    position: relative;
+    padding: 0 40px;
+  }
+  .hero-quote::before, .hero-quote::after {
+    content: '"';
+    position: absolute;
+    font-size: 80px; opacity: 0.15; line-height: 1;
+    font-family: Georgia, serif;
+  }
+  .hero-quote::before { top: -10px; left: 0; }
+  .hero-quote::after { bottom: -30px; right: 0; content: '"'; }
+
+  /* ---- SLIDE 1 ---- */
+  .title-tag {
+    display: flex; gap: 10px; margin-bottom: 32px; flex-wrap: wrap; justify-content: center;
+  }
+  .tag {
+    font-size: 12px; padding: 5px 14px; border-radius: 20px;
+    font-weight: 600; letter-spacing: 0.5px;
+  }
+  .tag-blue { background: var(--vision-glow); color: var(--vision); border: 1px solid rgba(59,130,246,0.3); }
+  .tag-green { background: var(--lang-glow); color: var(--lang); border: 1px solid rgba(34,197,94,0.3); }
+  .tag-purple { background: var(--fusion-glow); color: var(--fusion); border: 1px solid rgba(168,85,247,0.3); }
+
+  /* ---- HIGH-FIDELITY ARCHITECTURE PIPELINE ---- */
+  .arch-container {
+    width: 100%;
+    max-width: 1220px;
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .arch-pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+  .arch-col {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .inputs-col {
+    flex: 1.15;
+    gap: 10px;
+  }
+  .fusion-col {
+    flex: 1.45;
+  }
+  .action-col {
+    flex: 1.15;
+  }
+  .robot-col {
+    flex: 1.15;
+  }
+  .arch-stream {
+    border-radius: 14px;
+    padding: 13px 15px;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .stream-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .stream-icon { font-size: 20px; line-height: 1; }
+  .stream-title { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+  .stream-sub { font-size: 10.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+  .stream-body { display: flex; flex-direction: column; gap: 5px; }
+  .stream-step {
+    font-size: 11px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.35;
+  }
+  .step-badge {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+  }
+  .stream-core {
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin: 3px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stream-core strong { font-size: 12px; }
+  .sub-chip { font-size: 9.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .arch-token-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 7px;
+    text-align: center;
+    margin-top: 8px;
+    letter-spacing: 0.5px;
+  }
+  .pill-blue { background: rgba(59,130,246,0.18); color: var(--vision); border: 1px solid rgba(59,130,246,0.4); }
+  .pill-green { background: rgba(34,197,94,0.18); color: var(--lang); border: 1px solid rgba(34,197,94,0.4); }
+  .pill-purple { background: rgba(168,85,247,0.18); color: var(--fusion); border: 1px solid rgba(168,85,247,0.4); }
+  .pill-orange { background: rgba(249,115,22,0.18); color: var(--action); border: 1px solid rgba(249,115,22,0.4); }
+  .pill-cyan { background: rgba(6,182,212,0.18); color: #06b6d4; border: 1px solid rgba(6,182,212,0.4); }
+
+  .arch-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    flex-shrink: 0;
+  }
+  .connector-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .fusion-internal, .action-internal, .robot-internal {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+  .fusion-feature-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+  }
+  .fusion-box-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fusion);
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fusion-box-desc {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .action-note {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+    background: rgba(249,115,22,0.05);
+    border: 1px dashed rgba(249,115,22,0.25);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .robot-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .robot-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #06b6d4;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .closed-loop-bar {
+    margin-top: 12px;
+    background: rgba(13,17,23,0.85);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .loop-indicator {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 10px #22c55e;
+    animation: pulseDot 2s infinite ease-in-out;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+  }
+  .arch-specs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10.5px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .spec-item strong { color: var(--text); }
+  .spec-divider { color: rgba(255,255,255,0.2); }
+
+  /* ---- PAPER TIMELINE ---- */
+  .paper-row {
+    display: flex; gap: 16px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .paper-year {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--muted);
+    min-width: 40px;
+  }
+  .paper-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .paper-contrib { font-size: 12px; color: var(--muted); flex: 1; }
+
+  /* ---- DIFF DENOISING VISUAL ---- */
+  .denoise-steps {
+    display: flex; gap: 12px; align-items: center; justify-content: center;
+    margin: 20px 0;
+  }
+  .denoise-step {
+    width: 60px; height: 60px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; text-align: center; line-height: 1.3;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .step-noise { background: rgba(255,255,255,0.05); color: var(--muted); }
+  .step-t8 { background: rgba(249,115,22,0.1); color: var(--action); border-color: rgba(249,115,22,0.3); }
+  .step-t6 { background: rgba(249,115,22,0.15); color: var(--action); border-color: rgba(249,115,22,0.4); }
+  .step-t4 { background: rgba(249,115,22,0.2); color: var(--action); border-color: rgba(249,115,22,0.5); }
+  .step-t2 { background: rgba(249,115,22,0.3); color: var(--action); border-color: rgba(249,115,22,0.6); }
+  .step-clean { background: rgba(249,115,22,0.5); color: #fff; border-color: var(--action); font-size: 9px; }
+
+  /* ---- LORA VIZ ---- */
+  .lora-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; width: 100%; }
+  .lora-col { border-radius: 14px; padding: 24px; }
+  .lora-no { border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); }
+  .lora-yes { border: 1px solid rgba(34,197,94,0.3); background: rgba(34,197,94,0.05); }
+  .lora-col-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .lora-col-title .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: var(--lang); }
+  .lora-stat { margin: 10px 0; font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; }
+  .lora-stat strong { color: var(--text); }
+
+  /* Stars background */
+  .stars-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 70%, rgba(255,255,255,0.12) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.08) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.1) 0%, transparent 100%);
+  }
+
+  /* image slide */
+  .img-slide img { max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .img-caption { margin-top: 16px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  /* Pulse animation */
+  @keyframes pulse-glow {
+    0%,100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .pulse { animation: pulse-glow 2s infinite; }
+
+  /* slide-in items */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .slide.active .anim { animation: fadeUp 0.5s ease forwards; }
+  .slide.active .anim:nth-child(1) { animation-delay: 0.1s; opacity: 0; }
+  .slide.active .anim:nth-child(2) { animation-delay: 0.2s; opacity: 0; }
+  .slide.active .anim:nth-child(3) { animation-delay: 0.3s; opacity: 0; }
+  .slide.active .anim:nth-child(4) { animation-delay: 0.4s; opacity: 0; }
+  .slide.active .anim:nth-child(5) { animation-delay: 0.5s; opacity: 0; }
+  .slide.active .anim:nth-child(6) { animation-delay: 0.6s; opacity: 0; }
+
+  .latency-bar {
+    display: flex; align-items: center; gap: 12px; margin: 8px 0;
+    font-size: 13px;
+  }
+  .latency-label { min-width: 220px; color: var(--muted); }
+  .latency-track { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+  .latency-fill { height: 100%; border-radius: 4px; background: var(--fill-color, var(--accent)); }
+  .latency-val { min-width: 50px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  .total-box {
+    margin-top: 16px; padding: 14px 20px;
+    border-radius: 12px; border: 1px solid rgba(34,197,94,0.4);
+    background: rgba(34,197,94,0.06);
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700;
+  }
+  .total-box .num { font-family: 'JetBrains Mono', monospace; color: var(--lang); font-size: 18px; }
+</style>
+</head>
+<body>
+
+<div class="stars-bg"></div>
+<div id="progress-bar" style="width:6.67%"></div>
+
+<div id="slides">
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — TITLE -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1" style="--slide-glow: rgba(99,102,241,0.12)">
+  <div class="title-tag anim">
+    <span class="tag tag-blue">🔵 Vision</span>
+    <span class="tag tag-green">🟢 Language</span>
+    <span class="tag tag-purple">🟣 Action</span>
+  </div>
+  <h1 class="anim">Vision-Language-<br><span class="gradient-text">Action Models</span></h1>
+  <div class="hero-quote anim" style="margin-top: 32px;">
+    Pick up the red bottle and place it on the table.
+  </div>
+  <div class="anim" style="margin-top: 40px; display: flex; gap: 32px; flex-wrap: wrap; justify-content: center;">
+    <div class="stat-box" style="--stat-c1:#3b82f6;--stat-c2:#6366f1">
+      <div class="stat-num">8.4B</div>
+      <div class="stat-label">Parameters</div>
+    </div>
+    <div class="stat-box" style="--stat-c1:#a855f7;--stat-c2:#ec4899">
+      <div class="stat-num">10Hz</div>
+      <div class="stat-label">Control Rate</div>
+    </div>
+    <div class="stat-box" style="--stat-c1:#f97316;--stat-c2:#ef4444">
+      <div class="stat-num">7-DOF</div>
+      <div class="stat-label">Action Space</div>
+    </div>
+    <div class="stat-box" style="--stat-c1:#22c55e;--stat-c2:#06b6d4">
+      <div class="stat-num">~85ms</div>
+      <div class="stat-label">Inference</div>
+    </div>
+  </div>
+  <div class="anim" style="margin-top: 28px; font-size: 12px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase;">
+    ← → Arrow Keys or Space to Navigate
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — PROBLEM -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s2" style="--slide-glow: rgba(239,68,68,0.08)">
+  <div class="slide-label anim" style="--slide-accent:#ef4444">The Problem</div>
+  <h2 class="anim">Why Traditional Robots <span style="color:#ef4444">Fail</span></h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top: 32px; max-width: 900px;">
+    <div class="card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05);">
+      <div class="card-title" style="color: #ef4444;">❌ Traditional Robots</div>
+      <div class="card-body">
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:#ef4444; margin-top:2px;">✕</span>
+            <span>Hard-coded, rigid behaviour</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:#ef4444; margin-top:2px;">✕</span>
+            <span>Breaks when objects move</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:#ef4444; margin-top:2px;">✕</span>
+            <span>Requires expert programming per task</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:#ef4444; margin-top:2px;">✕</span>
+            <span>Cannot understand language</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.05);">
+      <div class="card-title" style="color: var(--lang);">✅ VLA-Powered Robot</div>
+      <div class="card-body">
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:var(--lang); margin-top:2px;">✓</span>
+            <span>Understands natural language</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:var(--lang); margin-top:2px;">✓</span>
+            <span>Adapts to scene changes in real-time</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:var(--lang); margin-top:2px;">✓</span>
+            <span>Generalizes to new objects</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="color:var(--lang); margin-top:2px;">✓</span>
+            <span>Learns from demonstrations</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card anim" style="margin-top:20px; max-width:900px; width:100%; background:rgba(99,102,241,0.06); border-color:rgba(99,102,241,0.3);">
+    <div style="text-align:center; font-size:18px; font-weight:700;">
+      <span style="color:var(--vision)">RGB Image</span>
+      &nbsp;+&nbsp;
+      <span style="color:var(--lang)">"Pick up the red bottle..."</span>
+      &nbsp;→&nbsp;
+      <span style="color:var(--action)">🦾 Robot Action</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — WHAT IS VLA -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s3" style="--slide-glow: rgba(99,102,241,0.1)">
+  <div class="slide-label anim">Concept</div>
+  <h2 class="anim">What is a <span class="gradient-text">VLA Model?</span></h2>
+  <div class="card-grid card-grid-3 anim" style="margin-top:32px; max-width:1000px;">
+    <div class="card card-vision">
+      <div style="font-size:32px; margin-bottom:12px;">🔵</div>
+      <div class="card-title" style="color:var(--vision);">Vision</div>
+      <div class="card-body">
+        What does the robot <strong>SEE?</strong><br><br>
+        RGB camera captures the scene. Visual encoder extracts spatial features.
+        <br><br>
+        <span class="pill pill-blue">DINOv2-ViT-L/14</span>
+      </div>
+    </div>
+    <div class="card card-lang">
+      <div style="font-size:32px; margin-bottom:12px;">🟢</div>
+      <div class="card-title" style="color:var(--lang);">Language</div>
+      <div class="card-body">
+        What is the robot <strong>TOLD?</strong><br><br>
+        Natural language instruction. LLM understands meaning and intent.
+        <br><br>
+        <span class="pill pill-green">LLaMA-3.1-8B</span>
+      </div>
+    </div>
+    <div class="card card-action">
+      <div style="font-size:32px; margin-bottom:12px;">🟠</div>
+      <div class="card-title" style="color:var(--action);">Action</div>
+      <div class="card-body">
+        What should the robot <strong>DO?</strong><br><br>
+        7-DOF delta actions. Diffusion policy generates precise movements.
+        <br><br>
+        <span class="pill pill-orange">Diffusion Policy</span>
+      </div>
+    </div>
+  </div>
+  <div class="card anim" style="margin-top:20px; max-width:1000px; width:100%; padding:16px 24px;">
+    <div style="text-align:center; color:var(--muted); font-size:14px;">
+      VLA = <strong style="color:var(--text)">Foundation VLM</strong> (pretrained on internet) + <strong style="color:var(--text)">Robot Action Head</strong> (trained on demonstrations)
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — MODEL COMPARISON -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s4" style="--slide-glow: rgba(99,102,241,0.1)">
+  <div class="slide-label anim">Foundation Models</div>
+  <h2 class="anim">Why We Chose <span style="color:var(--lang)">OpenVLA</span></h2>
+  <div class="table-wrap anim" style="margin-top:28px; max-width:900px;">
+    <table>
+      <thead><tr>
+        <th>Model</th><th>Params</th><th>Action Head</th><th>Open?</th><th>Our Use</th>
+      </tr></thead>
+      <tbody>
+        <tr style="background:rgba(34,197,94,0.06);">
+          <td><strong style="color:var(--lang)">OpenVLA ← Our Base</strong></td>
+          <td>7.5B</td>
+          <td>Tokenized</td>
+          <td style="color:var(--lang)">✅ Open</td>
+          <td><span class="pill pill-green">Backbone</span></td>
+        </tr>
+        <tr>
+          <td>RT-2 (Google DeepMind)</td>
+          <td style="color:#ef4444">55B</td>
+          <td>Tokenized</td>
+          <td style="color:#ef4444">❌ Closed</td>
+          <td style="color:var(--muted)">Design inspo</td>
+        </tr>
+        <tr>
+          <td>π₀ (Physical Intelligence)</td>
+          <td>3B</td>
+          <td>Flow-matching</td>
+          <td style="color:#ef4444">❌ Closed</td>
+          <td style="color:var(--muted)">Action head inspo</td>
+        </tr>
+        <tr>
+          <td>Octo</td>
+          <td>93M</td>
+          <td>Diffusion</td>
+          <td style="color:var(--lang)">✅ Open</td>
+          <td style="color:var(--muted)">Edge reference</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card anim" style="margin-top:20px; max-width:900px; width:100%; background:rgba(34,197,94,0.06); border-color:rgba(34,197,94,0.3);">
+    <div style="font-size:15px; text-align:center; font-weight:600;">
+      ✨ Our Architecture: <span style="color:var(--lang)">OpenVLA</span> backbone +
+      <span style="color:var(--action)">Diffusion Policy</span> action head
+      = Best of both worlds
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — ARCHITECTURE OVERVIEW -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s5" style="--slide-glow: rgba(99,102,241,0.12); padding: 24px 36px;">
+  <div class="slide-label anim">End-to-End System</div>
+  <h2 class="anim">Proposed <span class="gradient-text">VLA Architecture</span></h2>
+  
+  <div class="arch-container anim">
+    <div class="arch-pipeline">
+      
+      <!-- COLUMN 1: DUAL PERCEPTION STREAMS -->
+      <div class="arch-col inputs-col">
+        <!-- Vision Stream -->
+        <div class="arch-stream card-vision">
+          <div class="stream-header">
+            <span class="stream-icon">📷</span>
+            <div>
+              <div class="stream-title" style="color:var(--vision);">Vision Stream</div>
+              <div class="stream-sub">RGB Camera • 224×224×3</div>
+            </div>
+          </div>
+          <div class="stream-body">
+            <div class="stream-step">
+              <span class="step-badge">Patches</span> 16×16 Grid → 196 Tokens
+            </div>
+            <div class="stream-core" style="background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.35);">
+              <strong style="color:var(--vision)">DINOv2-ViT-L/14</strong>
+              <span class="sub-chip">Dense Spatial Representation</span>
+            </div>
+            <div class="stream-step">
+              <span class="step-badge">Perceiver</span> 196 → <strong>64 Tokens</strong>
+            </div>
+          </div>
+          <div class="arch-token-pill pill-blue">64 × 4096-d Tokens</div>
+        </div>
+
+        <!-- Language Stream -->
+        <div class="arch-stream card-lang">
+          <div class="stream-header">
+            <span class="stream-icon">💬</span>
+            <div>
+              <div class="stream-title" style="color:var(--lang);">Language Stream</div>
+              <div class="stream-sub">"Pick up red bottle &amp; place on table"</div>
+            </div>
+          </div>
+          <div class="stream-body">
+            <div class="stream-step">
+              <span class="step-badge">BPE</span> Tokenizer (≤ 77 tokens)
+            </div>
+            <div class="stream-core" style="background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.35);">
+              <strong style="color:var(--lang)">LLaMA-3.1-8B Embeddings</strong>
+              <span class="sub-chip">Semantic &amp; Affordance Priors</span>
+            </div>
+            <div class="stream-step">
+              <span class="step-badge" style="background:rgba(34,197,94,0.2); color:var(--lang);">Static KV-Cache</span> <strong>0ms</strong> Re-computation
+            </div>
+          </div>
+          <div class="arch-token-pill pill-green">77 × 4096-d Tokens</div>
+        </div>
+      </div>
+
+      <!-- CONNECTOR: CONVERGENCE -->
+      <div class="arch-connector">
+        <svg width="26" height="110" viewBox="0 0 26 110" fill="none">
+          <path d="M 2 26 C 14 26, 14 55, 23 55" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="3 2" />
+          <path d="M 2 84 C 14 84, 14 55, 23 55" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="3 2" />
+          <polygon points="25,55 18,50 18,60" fill="#a855f7" />
+        </svg>
+        <span class="connector-label">Fuse</span>
+      </div>
+
+      <!-- COLUMN 2: MULTIMODAL FUSION & REASONING -->
+      <div class="arch-col fusion-col">
+        <div class="arch-stream card-fusion" style="height:100%;">
+          <div class="stream-header">
+            <span class="stream-icon">🟣</span>
+            <div>
+              <div class="stream-title" style="color:var(--fusion);">Multimodal Transformer Backbone</div>
+              <div class="stream-sub">OpenVLA 8B Base • Vision-Language Fusion</div>
+            </div>
+          </div>
+
+          <div class="fusion-internal">
+            <div class="fusion-feature-box">
+              <div class="fusion-box-title">⚡ Multi-Head Cross-Attention (×8 heads)</div>
+              <div class="fusion-box-desc">Language tokens query spatial image patches → resolves target <strong>"red bottle"</strong> &amp; <strong>table</strong> in 3D space</div>
+            </div>
+            <div class="fusion-feature-box" style="border-color:rgba(234,179,8,0.3); background:rgba(234,179,8,0.06);">
+              <div class="fusion-box-title" style="color:#eab308;">✨ Low-Rank Adaptation (LoRA)</div>
+              <div class="fusion-box-desc">Adapts Q &amp; V projections (r=16, α=32) • <strong>Only 50M (0.6%)</strong> weights tuned</div>
+            </div>
+            <div class="fusion-feature-box" style="border-color:rgba(168,85,247,0.4); background:rgba(168,85,247,0.1);">
+              <div class="fusion-box-title">🧠 Multimodal Latent Context</div>
+              <div class="fusion-box-desc">Conditioning vector <span style="font-family:'JetBrains Mono',monospace; color:var(--fusion);">c_t ∈ ℝ⁴⁰⁹⁶</span></div>
+            </div>
+          </div>
+
+          <div class="arch-token-pill pill-purple">Conditioning Context c_t [4096-d]</div>
+        </div>
+      </div>
+
+      <!-- CONNECTOR 2 -->
+      <div class="arch-connector">
+        <svg width="26" height="40" viewBox="0 0 26 40" fill="none">
+          <line x1="2" y1="20" x2="19" y2="20" stroke="#f97316" stroke-width="2.5" />
+          <polygon points="25,20 17,15 17,25" fill="#f97316" />
+        </svg>
+        <span class="connector-label" style="color:var(--action)">Condition</span>
+      </div>
+
+      <!-- COLUMN 3: ACTION HEAD -->
+      <div class="arch-col action-col">
+        <div class="arch-stream card-action" style="height:100%;">
+          <div class="stream-header">
+            <span class="stream-icon">🟠</span>
+            <div>
+              <div class="stream-title" style="color:var(--action);">Action Generation Head</div>
+              <div class="stream-sub">Diffusion Policy / Conditional Denoising</div>
+            </div>
+          </div>
+
+          <div class="action-internal">
+            <div class="stream-step">
+              <span class="step-badge" style="background:rgba(249,115,22,0.2); color:var(--action);">Prior</span> Gaussian Noise ε ~ 𝒩(0, I₇)
+            </div>
+            <div class="stream-core" style="background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.35);">
+              <strong style="color:var(--action)">10 DDIM Denoising Steps</strong>
+              <span class="sub-chip">Conditioned on c_t • 20ms Latency</span>
+            </div>
+            <div class="action-note">
+              Captures multimodal action distributions (e.g. grasp from left vs top) without averaging
+            </div>
+          </div>
+
+          <div class="arch-token-pill pill-orange">Continuous 7-DOF Action a_t</div>
+        </div>
+      </div>
+
+      <!-- CONNECTOR 3 -->
+      <div class="arch-connector">
+        <svg width="26" height="40" viewBox="0 0 26 40" fill="none">
+          <line x1="2" y1="20" x2="19" y2="20" stroke="#06b6d4" stroke-width="2.5" />
+          <polygon points="25,20 17,15 17,25" fill="#06b6d4" />
+        </svg>
+        <span class="connector-label" style="color:#06b6d4">Command</span>
+      </div>
+
+      <!-- COLUMN 4: ROBOT EMBODIMENT -->
+      <div class="arch-col robot-col">
+        <div class="arch-stream card-accent" style="height:100%; border-color:rgba(6,182,212,0.35); background:rgba(6,182,212,0.06);">
+          <div class="stream-header">
+            <span class="stream-icon">🤖</span>
+            <div>
+              <div class="stream-title" style="color:#06b6d4;">Robot Embodiment</div>
+              <div class="stream-sub">UR5e / Franka Emika Panda</div>
+            </div>
+          </div>
+
+          <div class="robot-internal">
+            <div class="robot-card">
+              <span class="robot-badge">🛡️ Safety Guard Filter</span>
+              <div>Velocity limits &amp; workspace clipping (|Δp| ≤ 5cm)</div>
+            </div>
+            <div class="robot-card" style="border-color:rgba(99,102,241,0.3); background:rgba(99,102,241,0.08);">
+              <span class="robot-badge" style="color:#6366f1;">⚙️ Joint PD Controller</span>
+              <div>Cartesian delta tracking at 10Hz</div>
+            </div>
+            <div class="robot-card" style="border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.08);">
+              <span class="robot-badge" style="color:var(--lang);">🔄 Closed-Loop Control</span>
+              <div>100ms budget (85ms inference + 15ms move)</div>
+            </div>
+          </div>
+
+          <div class="arch-token-pill pill-cyan">10 Hz Closed-Loop Loop</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CLOSED-LOOP FEEDBACK & SPECS BAR -->
+    <div class="closed-loop-bar">
+      <div class="loop-indicator">
+        <span class="pulse-dot"></span>
+        <span><strong>Real-Time Closed-Loop Feedback:</strong> Robot executes <span style="font-family:'JetBrains Mono',monospace; color:var(--action);">a_t</span> → physical state updates → camera captures <span style="font-family:'JetBrains Mono',monospace; color:var(--vision);">I_{t+1}</span> at 10Hz</span>
+      </div>
+      <div class="arch-specs">
+        <span class="spec-item"><strong>Base:</strong> OpenVLA 8B</span>
+        <span class="spec-divider">•</span>
+        <span class="spec-item"><strong>Trainable:</strong> 50M LoRA (0.6%)</span>
+        <span class="spec-divider">•</span>
+        <span class="spec-item"><strong>Inference:</strong> ~85ms</span>
+        <span class="spec-divider">•</span>
+        <span class="spec-item"><strong>Rate:</strong> 10 Hz</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — VISION ENCODER -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s6" style="--slide-glow: rgba(59,130,246,0.12)">
+  <div class="slide-label anim" style="--slide-accent:var(--vision)">🔵 Component 1</div>
+  <h2 class="anim" style="color:var(--vision)">Vision Encoder</h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top:28px; max-width:1000px;">
+    <div class="card card-vision">
+      <div class="card-title" style="color:var(--vision);">Processing Flow</div>
+      <div class="code-block" style="font-size:12px; margin-top:12px;">
+<span class="code-blue">RGB Image</span>  [224 × 224 × 3]
+     ↓
+<span class="code-muted">16×16 patch split</span>
+     ↓
+<span class="code-blue">196 patch tokens</span> × 1024-dim
+     ↓
+<span class="code-blue">DINOv2-ViT-L/14</span>
+     ↓
+<span class="code-muted">Rich spatial features</span>
+     ↓
+<span class="code-blue">Perceiver Resampler</span>
+   196 → <span class="code-blue">64 tokens</span>
+     ↓
+<span class="code-blue">64 × 4096-dim</span></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card card-vision">
+        <div class="card-title" style="color:var(--vision);">Why DINOv2 over CLIP?</div>
+        <div class="card-body" style="margin-top:8px;">
+          CLIP → knows <em>WHAT</em> is in image<br>
+          DINOv2 → knows <em>WHERE</em> objects are<br><br>
+          <strong style="color:var(--text)">For grasping, spatial accuracy is everything.</strong>
+        </div>
+      </div>
+      <div class="card card-vision">
+        <div class="card-title" style="color:var(--vision);">Perceiver Resampler</div>
+        <div class="card-body" style="margin-top:8px;">
+          196 → 64 tokens → <strong style="color:var(--vision)">3× faster</strong> fusion<br><br>
+          Learnable queries compress only task-relevant visual info.<br>
+          From DeepMind's <strong>Flamingo</strong> (NeurIPS 2022).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — LANGUAGE ENCODER -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s7" style="--slide-glow: rgba(34,197,94,0.1)">
+  <div class="slide-label anim" style="--slide-accent:var(--lang)">🟢 Component 2</div>
+  <h2 class="anim" style="color:var(--lang)">Language Encoder</h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top:28px; max-width:1000px;">
+    <div class="card card-lang">
+      <div class="card-title" style="color:var(--lang);">Processing Flow</div>
+      <div class="code-block" style="font-size:12px; margin-top:12px;">
+<span class="code-muted">"Pick up the red bottle</span>
+<span class="code-muted"> and place it on the table"</span>
+     ↓
+<span class="code-green">BPE Tokenizer</span>
+vocab = 32,000 tokens
+     ↓
+<span class="code-green">Token IDs:</span>
+[1, 29347, 701, 278, ...]
+     ↓
+<span class="code-green">LLaMA-3.1-8B</span>
+(8 billion parameters)
+     ↓
+<span class="code-green">77 tokens × 4096-dim</span>
+semantic embeddings</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card card-lang">
+        <div class="card-title" style="color:var(--lang);">What LLaMA Understands</div>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted)"><em>"red"</em></span><span style="color:var(--lang)">→ colour attribute</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted)"><em>"bottle"</em></span><span style="color:var(--lang)">→ object class</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted)"><em>"pick up"</em></span><span style="color:var(--lang)">→ action intent</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted)"><em>"on the table"</em></span><span style="color:var(--lang)">→ spatial goal</span></div>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(234,179,8,0.4); background:rgba(234,179,8,0.06);">
+        <div class="card-title" style="color:#eab308;">⚡ KV-Cache Trick</div>
+        <div class="card-body" style="margin-top:8px; font-size:13px;">
+          Instruction is <strong>static</strong> across episode.<br>
+          Compute once → cache → <strong>reuse for 100+ steps</strong>.<br><br>
+          Saves <strong style="color:#eab308;">40ms per step</strong> → critical for 10Hz.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — MULTIMODAL FUSION -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s8" style="--slide-glow: rgba(168,85,247,0.12)">
+  <div class="slide-label anim" style="--slide-accent:var(--fusion)">🟣 Component 3</div>
+  <h2 class="anim" style="color:var(--fusion)">Multimodal Fusion</h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top:28px; max-width:1000px;">
+    <div class="card card-fusion">
+      <div class="card-title" style="color:var(--fusion);">Cross-Attention Mechanism</div>
+      <div class="code-block" style="font-size:12px; margin-top:12px;">
+<span class="code-green">Language: "red bottle"</span>
+     ↓ QUERIES →
+<span class="code-blue">Visual patches [64 tokens]</span>
+     ↓
+<span class="code-purple">High attention score</span>
+on bottle-region patches
+     ↓
+<span class="code-purple">6× Self-Attention layers</span>
+     ↓
+<span class="code-purple">Global Avg Pool</span>
+     ↓
+<span class="code-purple">Scene Embedding [1 × 4096]</span></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card card-fusion">
+        <div class="card-title" style="color:var(--fusion);">Visual Grounding</div>
+        <div class="card-body" style="margin-top:8px; font-size:14px; line-height:1.8;">
+          Language words <strong style="color:var(--fusion)">search</strong> through image patches.<br>
+          <em>"red"</em> → high attention on red pixels<br>
+          <em>"bottle"</em> → high attention on bottle shape<br>
+          <em>"table"</em> → high attention on table surface<br><br>
+          Words literally <strong style="color:var(--text)">find</strong> their visual counterparts.
+        </div>
+      </div>
+      <div class="card card-fusion">
+        <div class="card-title" style="color:var(--fusion);">Architecture Detail</div>
+        <div class="card-body" style="margin-top:8px; font-size:13px;">
+          8-head cross-attention<br>
+          6× transformer self-attention layers<br>
+          Output: <strong style="color:var(--fusion)">1 × 4096 scene embedding</strong><br>
+          = complete multimodal scene understanding
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 — ACTION GENERATION -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s9" style="--slide-glow: rgba(249,115,22,0.12)">
+  <div class="slide-label anim" style="--slide-accent:var(--action)">🟠 Component 4</div>
+  <h2 class="anim" style="color:var(--action)">Action Generation — Diffusion Policy</h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top:20px; max-width:1000px;">
+    <div class="card card-action">
+      <div class="card-title" style="color:var(--action);">Why Diffusion? Not Regression?</div>
+      <div class="card-body" style="margin-top:8px; font-size:13px; line-height:1.8;">
+        Multiple valid grasps exist:<br>
+        <span style="color:var(--action)">■</span> Grasp from left &nbsp;
+        <span style="color:var(--action)">■</span> Grasp from right<br><br>
+        <strong style="color:#ef4444">MSE regression</strong> → averages → bad middle grasp ❌<br>
+        <strong style="color:var(--lang)">Diffusion policy</strong> → full distribution ✅
+      </div>
+      <div class="denoise-steps" style="margin-top:16px;">
+        <div class="denoise-step step-noise">🎲<br>Noise<br>t=T</div>
+        <div style="color:var(--muted); font-size:18px;">›</div>
+        <div class="denoise-step step-t6">~<br>t=6</div>
+        <div style="color:var(--muted); font-size:18px;">›</div>
+        <div class="denoise-step step-t4">~<br>t=4</div>
+        <div style="color:var(--muted); font-size:18px;">›</div>
+        <div class="denoise-step step-t2">~<br>t=2</div>
+        <div style="color:var(--muted); font-size:18px;">›</div>
+        <div class="denoise-step step-clean">✓<br>Clean<br>Action</div>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card card-action">
+        <div class="card-title" style="color:var(--action);">7-DOF Action Space</div>
+        <div class="table-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr><th>Dim</th><th>Meaning</th><th>Range</th></tr></thead>
+            <tbody>
+              <tr><td>Δx, Δy, Δz</td><td>Position delta</td><td>±2 cm</td></tr>
+              <tr><td>Δroll, Δpitch, Δyaw</td><td>Rotation delta</td><td>±5°</td></tr>
+              <tr><td>gripper</td><td>Open / close</td><td>{0, 1}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card card-action">
+        <div class="card-title" style="color:var(--action);">DDIM Fast Sampling</div>
+        <div class="card-body" style="margin-top:8px; font-size:13px; line-height:1.7;">
+          Training: <strong>50</strong> denoising steps<br>
+          Inference: <strong style="color:var(--action)">10</strong> DDIM steps<br>
+          = <strong>5× speedup</strong>, minimal quality loss<br>
+          Time: <strong style="color:var(--action)">~20ms</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 10 — TRAINING PIPELINE -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s10" style="--slide-glow: rgba(99,102,241,0.1)">
+  <div class="slide-label anim">Training</div>
+  <h2 class="anim">3-Stage <span class="gradient-text">Training Pipeline</span></h2>
+  <div class="card-grid card-grid-3 anim" style="margin-top:28px; max-width:1100px;">
+    <div class="card card-vision">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--vision); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">1</div>
+        <div class="card-title" style="color:var(--vision); margin-bottom:0">Foundation (Free)</div>
+      </div>
+      <div class="card-body" style="font-size:13px; line-height:1.8;">
+        Pretrained on HuggingFace:<br>
+        • <strong>DINOv2</strong>: 142M images<br>
+        • <strong>LLaMA-3.1-8B</strong>: 15T tokens<br><br>
+        <span style="color:var(--lang); font-weight:600;">Cost: $0 — download weights</span>
+      </div>
+    </div>
+    <div class="card card-fusion">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--fusion); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">2</div>
+        <div class="card-title" style="color:var(--fusion); margin-bottom:0">Robot Co-Training</div>
+      </div>
+      <div class="card-body" style="font-size:13px; line-height:1.8;">
+        • Open X-Embodiment: <strong>1M+ eps</strong><br>
+        • BridgeData V2: <strong>60K demos</strong><br>
+        • DROID: <strong>76K demos</strong><br><br>
+        8× A100 GPUs, ~3 days
+      </div>
+    </div>
+    <div class="card card-action">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--action); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">3</div>
+        <div class="card-title" style="color:var(--action); margin-bottom:0">LoRA Fine-Tuning</div>
+      </div>
+      <div class="card-body" style="font-size:13px; line-height:1.8;">
+        • <strong>100–200</strong> custom demos<br>
+        • LoRA rank=16, alpha=32<br>
+        • Only <strong>0.6%</strong> params trained<br><br>
+        3–5 hours on 8× A100
+      </div>
+    </div>
+  </div>
+  <div class="flow anim" style="margin-top:20px; max-width:1100px;">
+    <div class="flow-node card-vision" style="font-size:12px; padding:10px;">
+      Pretrained<br>VLM weights
+    </div>
+    <div class="flow-arrow" style="color:var(--muted)">→</div>
+    <div class="flow-node card-fusion" style="font-size:12px; padding:10px;">
+      Robot data<br>co-training
+    </div>
+    <div class="flow-arrow" style="color:var(--muted)">→</div>
+    <div class="flow-node card-action" style="font-size:12px; padding:10px;">
+      Task-specific<br>LoRA tuning
+    </div>
+    <div class="flow-arrow" style="color:var(--muted)">→</div>
+    <div class="flow-node" style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); font-size:12px; padding:10px; border-radius:12px; text-align:center;">
+      🤖 Deployed<br>VLA Model
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 11 — LORA -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s11" style="--slide-glow: rgba(234,179,8,0.08)">
+  <div class="slide-label anim" style="--slide-accent:#eab308">Efficiency</div>
+  <h2 class="anim">LoRA — Fine-Tune <span style="color:#eab308">8B Params</span> in Hours</h2>
+  <div class="lora-compare anim" style="margin-top:28px;">
+    <div class="lora-col lora-no">
+      <div class="lora-col-title">
+        <div class="dot dot-red"></div>
+        Without LoRA
+      </div>
+      <div class="lora-stat"><span>Parameters updated:</span><strong style="color:#ef4444">8,000,000,000</strong></div>
+      <div class="lora-stat"><span>Training time:</span><strong style="color:#ef4444">Weeks</strong></div>
+      <div class="lora-stat"><span>GPU memory:</span><strong style="color:#ef4444">Extreme</strong></div>
+      <div class="lora-stat"><span>Risk:</span><strong style="color:#ef4444">Catastrophic forgetting</strong></div>
+    </div>
+    <div class="lora-col lora-yes">
+      <div class="lora-col-title">
+        <div class="dot dot-green"></div>
+        With LoRA (r=16) ✅
+      </div>
+      <div class="lora-stat"><span>Parameters updated:</span><strong style="color:var(--lang)">~50,000,000</strong></div>
+      <div class="lora-stat"><span>Training time:</span><strong style="color:var(--lang)">3–5 hours</strong></div>
+      <div class="lora-stat"><span>GPU memory:</span><strong style="color:var(--lang)">Manageable</strong></div>
+      <div class="lora-stat"><span>Risk:</span><strong style="color:var(--lang)">No forgetting</strong></div>
+    </div>
+  </div>
+  <div class="card anim" style="margin-top:20px; max-width:900px; width:100%; background:rgba(234,179,8,0.06); border-color:rgba(234,179,8,0.3);">
+    <div style="text-align:center; font-size:16px; font-weight:700; color:#eab308">
+      W' = W + ΔW = W + B·A &nbsp;&nbsp; where rank(A)=r=16 ≪ d
+    </div>
+    <div style="text-align:center; font-size:13px; color:var(--muted); margin-top:8px;">
+      Only A and B matrices are trained → <strong style="color:#eab308">95% compute savings</strong> → task-specific with 100–200 demos
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 12 — INFERENCE -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s12" style="--slide-glow: rgba(34,197,94,0.1)">
+  <div class="slide-label anim" style="--slide-accent:var(--lang)">Real-Time</div>
+  <h2 class="anim">Inference Pipeline — <span style="color:var(--lang)">10Hz Control</span></h2>
+  <div class="card anim" style="margin-top:24px; max-width:900px; width:100%;">
+    <div class="latency-bar">
+      <div class="latency-label">🔵 Vision Encoder (TensorRT INT8)</div>
+      <div class="latency-track"><div class="latency-fill" style="width:18%; --fill-color:var(--vision)"></div></div>
+      <div class="latency-val" style="color:var(--vision)">15ms</div>
+    </div>
+    <div class="latency-bar">
+      <div class="latency-label">🟢 Language Encoder (KV-cached)</div>
+      <div class="latency-track"><div class="latency-fill" style="width:1%; --fill-color:var(--lang)"></div></div>
+      <div class="latency-val" style="color:var(--lang)">~0ms</div>
+    </div>
+    <div class="latency-bar">
+      <div class="latency-label">🟣 Cross-Attention Fusion</div>
+      <div class="latency-track"><div class="latency-fill" style="width:12%; --fill-color:var(--fusion)"></div></div>
+      <div class="latency-val" style="color:var(--fusion)">10ms</div>
+    </div>
+    <div class="latency-bar">
+      <div class="latency-label">🟠 Diffusion Head (10 DDIM steps)</div>
+      <div class="latency-track"><div class="latency-fill" style="width:24%; --fill-color:var(--action)"></div></div>
+      <div class="latency-val" style="color:var(--action)">20ms</div>
+    </div>
+    <div class="latency-bar">
+      <div class="latency-label" style="color:var(--muted)">Robot Execution + Overhead</div>
+      <div class="latency-track"><div class="latency-fill" style="width:48%; --fill-color:#6366f1"></div></div>
+      <div class="latency-val">~40ms</div>
+    </div>
+    <div class="total-box">
+      <div style="font-size:14px; color:var(--text)">Total per control step</div>
+      <div class="num">~85ms → <span style="color:#fff">10 Hz ✅</span></div>
+    </div>
+  </div>
+  <div class="card anim" style="margin-top:14px; max-width:900px; width:100%; padding:14px 20px;">
+    <div style="display:flex; gap:24px; justify-content:center; flex-wrap:wrap; font-size:13px; color:var(--muted);">
+      <span>📸 New RGB every 100ms</span>
+      <span>→</span>
+      <span style="color:var(--vision)">Vision [15ms]</span>
+      <span>→</span>
+      <span style="color:var(--fusion)">Fuse [10ms]</span>
+      <span>→</span>
+      <span style="color:var(--action)">Action [20ms]</span>
+      <span>→</span>
+      <span>🤖 Execute</span>
+      <span>→</span>
+      <span style="color:#6366f1">↺ Repeat</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 13 — CHALLENGES -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s13" style="--slide-glow: rgba(239,68,68,0.08)">
+  <div class="slide-label anim" style="--slide-accent:#ef4444">Deployment</div>
+  <h2 class="anim">Real-World <span style="color:#ef4444">Challenges</span> & Solutions</h2>
+  <div class="card-grid card-grid-2 anim" style="margin-top:28px; max-width:1000px;">
+    <div class="card">
+      <div class="challenge" style="--ch-color:#ef4444; margin-bottom:14px;">
+        <div class="challenge-title">⚡ Latency (8B model too slow)</div>
+        <div class="challenge-body">TensorRT INT8 quantization + KV-cache + 10-step DDIM → 85ms total</div>
+      </div>
+      <div class="challenge" style="--ch-color:var(--vision);">
+        <div class="challenge-title">🔀 Distribution Shift</div>
+        <div class="challenge-body">Domain randomization in simulation + real-world fine-tuning with 100-200 demos</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="challenge" style="--ch-color:var(--action); margin-bottom:14px;">
+        <div class="challenge-title">🔒 Safety</div>
+        <div class="challenge-body">Action clamping + velocity limits + force-torque monitoring → halt on anomaly</div>
+      </div>
+      <div class="challenge" style="--ch-color:var(--fusion);">
+        <div class="challenge-title">💻 Edge Deployment</div>
+        <div class="challenge-body">Distill 8B → 3B + INT8 quantization + NVIDIA Jetson Orin (275 TOPS)</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="challenge" style="--ch-color:#eab308;">
+        <div class="challenge-title">👁️ Object Hallucination</div>
+        <div class="challenge-body">Parallel YOLO-v8 object detector + confidence thresholding → stop if uncertain</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="challenge" style="--ch-color:var(--lang);">
+        <div class="challenge-title">🌉 Sim-to-Real Gap</div>
+        <div class="challenge-body">MuJoCo/IsaacSim training + texture/lighting randomization + real demo mixing</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 14 — REFERENCES -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s14" style="--slide-glow: rgba(99,102,241,0.1)">
+  <div class="slide-label anim">Research Foundation</div>
+  <h2 class="anim">Key <span class="gradient-text">Papers & References</span></h2>
+  <div class="card anim" style="margin-top:24px; max-width:1000px; width:100%;">
+    <div class="paper-row"><div class="paper-year">2022</div><div class="paper-title" style="color:var(--vision)">Flamingo — DeepMind</div><div class="paper-contrib">Cross-attention fusion, Perceiver Resampler</div></div>
+    <div class="paper-row"><div class="paper-year">2022</div><div class="paper-title" style="color:#eab308">LoRA — ICLR</div><div class="paper-contrib">Efficient fine-tuning, low-rank adaptation</div></div>
+    <div class="paper-row"><div class="paper-year">2023</div><div class="paper-title" style="color:var(--action)">Diffusion Policy — RSS</div><div class="paper-contrib">Action generation via denoising</div></div>
+    <div class="paper-row"><div class="paper-year">2023</div><div class="paper-title" style="color:#6366f1">RT-2 — Google DeepMind</div><div class="paper-contrib">VLA design: tokenized actions + web data</div></div>
+    <div class="paper-row"><div class="paper-year">2023</div><div class="paper-title" style="color:var(--vision)">DINOv2 — Meta</div><div class="paper-contrib">Vision encoder: spatial self-supervised ViT</div></div>
+    <div class="paper-row"><div class="paper-year">2024</div><div class="paper-title" style="color:var(--lang)">OpenVLA — Open Source</div><div class="paper-contrib">Our backbone: 7.5B, DINOv2 + LLaMA-2</div></div>
+    <div class="paper-row"><div class="paper-year">2024</div><div class="paper-title" style="color:var(--fusion)">Open X-Embodiment</div><div class="paper-contrib">1M+ demos, 22 robots, 21 labs — training data</div></div>
+    <div class="paper-row" style="border:none;"><div class="paper-year">2024</div><div class="paper-title" style="color:var(--action)">π₀ — Physical Intelligence</div><div class="paper-contrib">Flow-matching action head inspiration</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 15 — SUMMARY -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s15" style="--slide-glow: rgba(99,102,241,0.15)">
+  <div class="slide-label anim">Summary</div>
+  <h2 class="anim">The Complete <span class="gradient-text">VLA Architecture</span></h2>
+  <div class="flow anim" style="margin-top:32px; max-width:1100px; gap:4px;">
+    <div class="flow-node card-vision">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--vision);">DINOv2</div>
+      <span class="flow-sub">Vision<br>64 tokens</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node card-fusion" style="flex:1.3">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--fusion);">Cross-Attention</div>
+      <span class="flow-sub">LLaMA-3.1-8B<br>Grounding</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node card-action">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--action);">Diffusion</div>
+      <span class="flow-sub">7-DOF Action<br>10 DDIM steps</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node card-accent">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#6366f1;">Robot</div>
+      <span class="flow-sub">10 Hz<br>Closed-loop</span>
+    </div>
+  </div>
+  <div class="card-grid card-grid-3 anim" style="margin-top:20px; max-width:1100px;">
+    <div class="card card-vision" style="padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--vision); margin-bottom:6px;">DINOv2 > CLIP</div>
+      <div style="font-size:12px; color:var(--muted);">Spatial understanding → better grasping</div>
+    </div>
+    <div class="card card-fusion" style="padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--fusion); margin-bottom:6px;">Cross-Attention Grounding</div>
+      <div style="font-size:12px; color:var(--muted);">Words literally find objects in image</div>
+    </div>
+    <div class="card card-action" style="padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--action); margin-bottom:6px;">Diffusion > Regression</div>
+      <div style="font-size:12px; color:var(--muted);">Multimodal action distributions handled</div>
+    </div>
+    <div class="card" style="padding:16px; border-color:rgba(234,179,8,0.3); background:rgba(234,179,8,0.05);">
+      <div style="font-size:13px; font-weight:700; color:#eab308; margin-bottom:6px;">LoRA = 0.6% params</div>
+      <div style="font-size:12px; color:var(--muted);">Fine-tune in hours, not weeks</div>
+    </div>
+    <div class="card" style="padding:16px; border-color:rgba(99,102,241,0.3); background:rgba(99,102,241,0.05);">
+      <div style="font-size:13px; font-weight:700; color:#6366f1; margin-bottom:6px;">10Hz Real-Time</div>
+      <div style="font-size:12px; color:var(--muted);">~85ms end-to-end, deployable</div>
+    </div>
+    <div class="card card-lang" style="padding:16px;">
+      <div style="font-size:13px; font-weight:700; color:var(--lang); margin-bottom:6px;">100–200 Demos Enough</div>
+      <div style="font-size:12px; color:var(--muted);">Pretrained foundation = data efficiency</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /slides -->
+
+<!-- NAV -->
+<div id="nav">
+  <button class="nav-btn" id="prev-btn">← Prev</button>
+  <span id="slide-counter">1 / 15</span>
+  <button class="nav-btn" id="next-btn">Next →</button>
+</div>
+
+<script>
+let current = 0;
+const total = 15;
+const slides = document.querySelectorAll('.slide');
+const counter = document.getElementById('slide-counter');
+const progressBar = document.getElementById('progress-bar');
+
+function goTo(n) {
+  slides[current].classList.remove('active');
+  slides[current].classList.add('exit');
+  setTimeout(() => slides[current].classList.remove('exit'), 500);
+  current = n;
+  slides[current].classList.add('active');
+  counter.textContent = `${current + 1} / ${total}`;
+  progressBar.style.width = `${((current + 1) / total) * 100}%`;
+}
+
+document.getElementById('next-btn').addEventListener('click', () => {
+  if (current < total - 1) goTo(current + 1);
+});
+document.getElementById('prev-btn').addEventListener('click', () => {
+  if (current > 0) goTo(current - 1);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+    e.preventDefault();
+    if (current < total - 1) goTo(current + 1);
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (current > 0) goTo(current - 1);
+  }
+});
+</script>
+</body>
+</html>

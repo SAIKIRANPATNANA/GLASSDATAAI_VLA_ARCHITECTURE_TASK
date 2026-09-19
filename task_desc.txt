@@ -1,0 +1,8 @@
+Design a Vision-Language-Action (VLA) model architecture for a robotic manipulation task. Consider a robot equipped with an RGB camera and a robotic arm that receives a natural-language instruction such as “Pick up the red bottle and place it on the table.” The robot should understand the visual scene and instruction and generate appropriate actions to complete the task.
+
+propose a practical VLA-based solution for this problem. Explain the overall architecture, including the vision encoder, language model, multimodal fusion, and action-generation components. Identify suitable existing VLM/VLA models that could be used as a foundation and justify your choices. Explain how you would represent the robot's actions, what training data would be required, how the model could be fine-tuned for the task, and how the complete inference process would work from RGB image + language instruction → robot action. Also discuss the major challenges involved in deploying the model for real-time robotic inference and how you would address them.
+
+Submit your proposed architecture as a diagram along with a concise technical explanation and references to the models or research papers used.
+
+
+submit to careers@glassdata.ai
