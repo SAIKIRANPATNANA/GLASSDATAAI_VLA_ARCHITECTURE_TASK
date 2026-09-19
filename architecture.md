@@ -15,7 +15,7 @@
 
 ## 1. Problem Formulation
 
-We consider a robotic manipulation setup where a robotic arm (e.g., Franka Emika Panda, Universal Robots UR5e) equipped with an RGB sensor and a parallel-jaw gripper must execute natural-language commands:
+I consider a robotic manipulation setup where a robotic arm (e.g., Franka Emika Panda, Universal Robots UR5e) equipped with an RGB sensor and a parallel-jaw gripper must execute natural-language commands:
 
 $$\text{Task: "Pick up the red bottle and place it on the table."}$$
 
@@ -37,7 +37,7 @@ The policy must ground semantic noun phrases (*"red bottle"*, *"table"*) to phys
 | **$\pi_0$** | Physical Intelligence (2024) | Flow-matching (continuous) | Excellent high-frequency dexterous control. | Closed weights and proprietary training recipe. |
 | **Octo** | Octo Model Team (2024) | Continuous diffusion head | Lightweight transformer; multi-robot support. | 93M backbone has limited visual reasoning and zero-shot generalization. |
 
-**Selected Foundation**: We design a hybrid architecture utilizing the **OpenVLA backbone** (DINOv2 + LLaMA-3.1-8B) for web-scale semantic reasoning, replacing its discrete tokenized action head with a **Continuous Diffusion Policy Head** (Chi et al., 2023) to achieve smooth, multimodal action generation.
+**Selected Foundation**: I design a hybrid architecture utilizing the **OpenVLA backbone** (DINOv2 + LLaMA-3.1-8B) for web-scale semantic reasoning, replacing its discrete tokenized action head with a **Continuous Diffusion Policy Head** (Chi et al., 2023) to achieve smooth, multimodal action generation.
 
 ---
 
@@ -178,7 +178,7 @@ Manipulator executes step (100 ms window) → Camera captures I_{t+1}
 
 ## 5. Fine-Tuning Methodology
 
-We freeze the pretrained vision encoder and the majority of the language transformer, applying Low-Rank Adaptation (LoRA) to adapt the system with high parameter efficiency:
+I freeze the pretrained vision encoder and the majority of the language transformer, applying Low-Rank Adaptation (LoRA) to adapt the system with high parameter efficiency:
 
 ```python
 from peft import LoraConfig, get_peft_model

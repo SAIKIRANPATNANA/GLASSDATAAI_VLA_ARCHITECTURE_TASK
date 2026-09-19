@@ -8,7 +8,7 @@
 
 ## Problem Formulation
 
-We consider a robotic manipulation setup consisting of a 6- or 7-DOF manipulator (e.g., Franka Emika Panda, Universal Robots UR5e) equipped with a parallel-jaw gripper and an RGB camera mounted in an eye-in-hand or fixed third-person configuration. The system receives natural-language task specifications such as:
+I consider a robotic manipulation setup consisting of a 6- or 7-DOF manipulator (e.g., Franka Emika Panda, Universal Robots UR5e) equipped with a parallel-jaw gripper and an RGB camera mounted in an eye-in-hand or fixed third-person configuration. The system receives natural-language task specifications such as:
 
 > *"Pick up the red bottle and place it on the table."*
 
@@ -74,22 +74,22 @@ RGB Observation (224×224×3)               Language Instruction
 ## Design Rationale
 
 ### Vision Representation: Spatial Grounding with DINOv2
-Standard contrastive visual-language models (e.g., CLIP) optimize for global image-text semantic alignment, frequently discarding local spatial topology and fine geometric boundaries. For contact-rich grasping, precise spatial localization is critical. We adopt **DINOv2-ViT-L/14**, whose self-supervised objective learns patch-level features with strong geometric and depth correspondences.
+Standard contrastive visual-language models (e.g., CLIP) optimize for global image-text semantic alignment, frequently discarding local spatial topology and fine geometric boundaries. For contact-rich grasping, precise spatial localization is critical. I adopt **DINOv2-ViT-L/14**, whose self-supervised objective learns patch-level features with strong geometric and depth correspondences.
 - Input resolution: $224 \times 224 \times 3$ with $14 \times 14$ patches produces a $16 \times 16$ spatial grid ($256$ tokens, 1024-dim).
 - **Perceiver Resampler**: Compresses $256$ patch tokens to $64$ uniform latent tokens ($64 \times 4096$). This reduces sequence length by $4\times$, containing self-attention memory overhead while preserving salient spatial cues.
 - Weights remain frozen during robotic adaptation to avoid catastrophic forgetting of general visual priors.
 
 ### Language Representation: LLaMA-3.1-8B with Edge Modularity
 - **Server / Workstation Deployment**: LLaMA-3.1-8B provides strong zero-shot instruction parsing, spatial preposition resolution, and distractor rejection.
-- **Edge / Onboard Alternative**: Because our architecture decouples perception via the Perceiver projection layer, the language backbone can be substituted with **LLaMA-3.2-3B** or **Gemma-2-2B** on compute-constrained platforms (e.g., NVIDIA Jetson AGX Orin), reducing memory consumption by $60\%$ and forward pass latency to $\sim 15$ ms.
-- **Static Instruction KV-Caching**: In typical robotic tasks, the user prompt does not vary across timesteps within an episode. We precompute and cache the key-value representations of the language instruction at step $t=0$, dropping language computation latency to $0$ ms for all subsequent steps ($t \ge 1$).
+- **Edge / Onboard Alternative**: Because my architecture decouples perception via the Perceiver projection layer, the language backbone can be substituted with **LLaMA-3.2-3B** or **Gemma-2-2B** on compute-constrained platforms (e.g., NVIDIA Jetson AGX Orin), reducing memory consumption by $60\%$ and forward pass latency to $\sim 15$ ms.
+- **Static Instruction KV-Caching**: In typical robotic tasks, the user prompt does not vary across timesteps within an episode. I precompute and cache the key-value representations of the language instruction at step $t=0$, dropping language computation latency to $0$ ms for all subsequent steps ($t \ge 1$).
 
 ### Multimodal Fusion: Directed Cross-Attention
-We implement $6$ transformer layers where language queries attend directly over visual patch keys and values. This cross-attention mechanism implements explicit visual grounding: token representations for *"red bottle"* attend to corresponding spatial image patches, while *"table"* attends to potential support surfaces. The output is pooled into a single conditioning context vector $\mathbf{c}_t \in \mathbb{R}^{4096}$.
+I implement $6$ transformer layers where language queries attend directly over visual patch keys and values. This cross-attention mechanism implements explicit visual grounding: token representations for *"red bottle"* attend to corresponding spatial image patches, while *"table"* attends to potential support surfaces. The output is pooled into a single conditioning context vector $\mathbf{c}_t \in \mathbb{R}^{4096}$.
 
 ### Action Generation: Continuous Diffusion Policy
 Standard behavioral cloning with Mean Squared Error (MSE) regression assumes unimodal action distributions. In manipulation, tasks are fundamentally multimodal—a cylindrical bottle can be approached from the left, right, or top with equal validity. Averaging distinct valid modes results in collision-prone interpolated trajectories.
-- We utilize a **Diffusion Policy** (DDPM formulation with DDIM sampling).
+- I utilize a **Diffusion Policy** (DDPM formulation with DDIM sampling).
 - At inference, the policy denoises random Gaussian noise $\boldsymbol{\epsilon} \sim \mathcal{N}(0, \mathbf{I}_7)$ in $10$ deterministic DDIM steps conditioned on $\mathbf{c}_t$.
 - Compared to the discrete tokenized action outputs of RT-2 or baseline OpenVLA (which discretize each DOF into 256 bins), continuous diffusion outputs eliminate discretization artifacts, producing continuous, physically smooth control trajectories.
 - **Action Chunking**: The policy outputs a trajectory chunk of horizon $H = 8$. Executing the initial $K = 4$ steps amortizes diffusion inference cost and mitigates trajectory drift.
@@ -140,7 +140,7 @@ Real-time closed-loop robotic control at **10 Hz** enforces a hard execution cei
 
 ## Fine-Tuning Methodology
 
-We apply Low-Rank Adaptation (LoRA) to adapt the generalist foundation model to the specific manipulation setup while retaining pretrained world knowledge.
+I apply Low-Rank Adaptation (LoRA) to adapt the generalist foundation model to the specific manipulation setup while retaining pretrained world knowledge.
 
 ```python
 from peft import LoraConfig, get_peft_model
