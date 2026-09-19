@@ -23,6 +23,7 @@ GLASSDATAAI_VLA_ARCHITECTURE_TASK/
 ├── README.md                    # System overview, design decisions, and benchmarks
 ├── architecture.md              # Detailed technical specification and mathematical formulation
 ├── vla_presentation.html        # Interactive 15-slide technical architecture deck
+├── vla_presentation.pdf         # 15-slide technical architecture deck (16:9 widescreen PDF)
 ├── vla_architecture_diagram.jpg # End-to-end perception-to-action flow diagram
 ├── vla_training_pipeline.jpg    # 3-stage training and adaptation pipeline
 └── task_desc.txt                # System requirements and task brief
@@ -208,7 +209,6 @@ The language representation is computed once and held static. The visual observa
 
 ## Presentation Slide Deck
 
-A browser-based technical deck is available in [`vla_presentation.html`](./vla_presentation.html):
-- Contains 15 technical slides covering model architecture, mathematical formulation, latency profiling, and deployment safety.
-- Interactive keyboard navigation (`←` / `→` or `Space`).
-- Can be viewed directly via `brave vla_presentation.html` or through any static file server.
+A 15-slide technical architecture deck is available in both interactive and printable document formats:
+- **Interactive Deck**: [`vla_presentation.html`](./vla_presentation.html) (interactive keyboard navigation `←` / `→` or `Space`, live latency breakdowns, and architectural flow animations).
+- **PDF Document**: [`vla_presentation.pdf`](./vla_presentation.pdf) (15-slide widescreen 16:9 PDF export for offline review and presentation).
