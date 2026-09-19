@@ -800,14 +800,14 @@
           </div>
           <div class="stream-body">
             <div class="stream-step">
-              <span class="step-badge">Patches</span> 16×16 Grid → 196 Tokens
+              <span class="step-badge">Patches</span> 14×14 Patches → 256 Tokens
             </div>
             <div class="stream-core" style="background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.35);">
               <strong style="color:var(--vision)">DINOv2-ViT-L/14</strong>
               <span class="sub-chip">Dense Spatial Representation</span>
             </div>
             <div class="stream-step">
-              <span class="step-badge">Perceiver</span> 196 → <strong>64 Tokens</strong>
+              <span class="step-badge">Perceiver</span> 256 → <strong>64 Tokens</strong>
             </div>
           </div>
           <div class="arch-token-pill pill-blue">64 × 4096-d Tokens</div>
@@ -987,16 +987,16 @@
       <div class="code-block" style="font-size:12px; margin-top:12px;">
 <span class="code-blue">RGB Image</span>  [224 × 224 × 3]
      ↓
-<span class="code-muted">16×16 patch split</span>
+<span class="code-muted">14×14 patch split (16×16 grid)</span>
      ↓
-<span class="code-blue">196 patch tokens</span> × 1024-dim
+<span class="code-blue">256 patch tokens</span> × 1024-dim
      ↓
 <span class="code-blue">DINOv2-ViT-L/14</span>
      ↓
 <span class="code-muted">Rich spatial features</span>
      ↓
 <span class="code-blue">Perceiver Resampler</span>
-   196 → <span class="code-blue">64 tokens</span>
+   256 → <span class="code-blue">64 tokens</span>
      ↓
 <span class="code-blue">64 × 4096-dim</span></div>
     </div>
@@ -1012,7 +1012,7 @@
       <div class="card card-vision">
         <div class="card-title" style="color:var(--vision);">Perceiver Resampler</div>
         <div class="card-body" style="margin-top:8px;">
-          196 → 64 tokens → <strong style="color:var(--vision)">3× faster</strong> fusion<br><br>
+          256 → 64 tokens → <strong style="color:var(--vision)">4× faster</strong> fusion<br><br>
           Learnable queries compress only task-relevant visual info.<br>
           From DeepMind's <strong>Flamingo</strong> (NeurIPS 2022).
         </div>
