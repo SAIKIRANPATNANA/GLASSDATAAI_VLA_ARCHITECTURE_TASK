@@ -562,14 +562,70 @@
   .latency-fill { height: 100%; border-radius: 4px; background: var(--fill-color, var(--accent)); }
   .latency-val { min-width: 50px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
 
-  .total-box {
-    margin-top: 16px; padding: 14px 20px;
-    border-radius: 12px; border: 1px solid rgba(34,197,94,0.4);
-    background: rgba(34,197,94,0.06);
-    display: flex; justify-content: space-between; align-items: center;
-    font-weight: 700;
-  }
   .total-box .num { font-family: 'JetBrains Mono', monospace; color: var(--lang); font-size: 18px; }
+
+  /* ---- PRINT / PDF STYLES ---- */
+  @media print {
+    @page {
+      size: 16in 9in;
+      margin: 0;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      animation: none !important;
+      transition: none !important;
+      box-sizing: border-box !important;
+    }
+    html, body {
+      background: #0d1117 !important;
+      color: #f1f5f9 !important;
+      width: 16in !important;
+      height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+    }
+    #nav, #controls, #progress-bar, #fullscreen-btn {
+      display: none !important;
+    }
+    #slides {
+      position: static !important;
+      width: 16in !important;
+      height: auto !important;
+      display: block !important;
+      overflow: visible !important;
+    }
+    .slide {
+      position: relative !important;
+      width: 16in !important;
+      height: 9in !important;
+      min-height: 9in !important;
+      max-height: 9in !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      align-items: center !important;
+      padding: 40px 60px !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      opacity: 1 !important;
+      transform: none !important;
+      pointer-events: auto !important;
+      overflow: hidden !important;
+    }
+    .slide.exit {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    .anim {
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+    }
+  }
 </style>
 </head>
 <body>
